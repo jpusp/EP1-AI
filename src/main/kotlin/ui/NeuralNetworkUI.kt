@@ -6,6 +6,7 @@ import org.jfree.chart.labels.StandardXYToolTipGenerator
 import org.jfree.chart.plot.PlotOrientation
 import org.jfree.data.xy.XYSeries
 import org.jfree.data.xy.XYSeriesCollection
+import java.awt.GridLayout
 import javax.swing.*
 
 
@@ -19,6 +20,9 @@ class NeuralNetworkUI(
     private val targetFileLabel = JLabel(NoFileSelected)
     private val testFileLabel = JLabel(NoFileSelected)
     private val mseSeries = XYSeries("MSE")
+    private val epochsTextField = JTextField("500", 10)
+    private val hiddenLayersTextField = JTextField("35", 10)
+    private val outputLayersTextField = JTextField("7", 10)
 
     private var epochs = 500
     private var learningRate = 0.2
@@ -29,7 +33,7 @@ class NeuralNetworkUI(
         layout = BoxLayout(contentPane, BoxLayout.Y_AXIS)
         setLocationRelativeTo(null)
 
-        setupFileChoosers()
+        setupTrainingSection()
         setupGraph()
         setupTrainButton()
         setupTestButton()
@@ -37,30 +41,45 @@ class NeuralNetworkUI(
         isVisible = true
     }
 
-    private fun setupNorthPanel() {
-        add(createRow().apply {
-            add(JButton("Selecionar Training File").apply {
-                addActionListener { chooseFile(trainingFileLabel) }
-            })
-            add(trainingFileLabel)
-        })
+    private fun setupTrainingSection() {
+        val row = JPanel(GridLayout(1, 3, 10, 10))
 
-        add(createRow().apply {
-            add(JButton("Selecionar Target File").apply {
-                addActionListener { chooseFile(targetFileLabel) }
-            })
-            add(targetFileLabel)
-        })
-    }
+        row.add(
+            createColumn().apply {
+                add(JButton("Selecionar Training File").apply {
+                    addActionListener { chooseFile(trainingFileLabel) }
+                })
+                add(trainingFileLabel)
 
-    private fun setupFileChoosers() {
-        setupNorthPanel()
+                add(
+                    createRow().apply {
+                        add (JLabel("Épocas"))
+                        add(epochsTextField)
+                    }
+                )
+            }
+        )
 
-        val testButton = JButton("Selecionar Test File").apply {
-            addActionListener { chooseFile(testFileLabel) }
-        }
-        add(testButton)
-        add(testFileLabel)
+        row.add(
+            createColumn().apply {
+                add(JButton("Selecionar Target File").apply {
+                    addActionListener { chooseFile(targetFileLabel) }
+                })
+                add(targetFileLabel)
+            }
+        )
+
+        row.add(
+            createColumn().apply {
+                add(JButton("Selecionar Test File").apply {
+                    addActionListener { chooseFile(testFileLabel) }
+                })
+                add(testFileLabel)
+            }
+        )
+
+        // Adicionando a linha ao contentPane
+        add(row)
     }
 
     private fun setupTrainButton() {
@@ -120,5 +139,10 @@ class NeuralNetworkUI(
     private fun createRow() = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.X_AXIS)
         alignmentX = LEFT_ALIGNMENT
+    }
+
+    private fun createColumn() = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        alignmentY = TOP_ALIGNMENT
     }
 }
