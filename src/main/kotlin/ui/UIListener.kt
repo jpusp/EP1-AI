@@ -1,8 +1,10 @@
 package ui
 
+import config.Config
+
 interface UIListener {
 
-    fun onTrainButtonClicked(epochs: Int, learningRate: Double)
+    fun onTrainButtonClicked(config: Config)
 
     fun onTestButtonClicked()
 }

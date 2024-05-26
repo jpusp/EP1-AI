@@ -1,5 +1,6 @@
 package ui
 
+import config.Config
 import mlp.Layer
 import mlp.MLP
 import mlp.Neuron
@@ -12,30 +13,37 @@ fun main() {
 }
 
 class Main : UIListener {
-    private val ui = NeuralNetworkUI(this)
+    private val config = Config()
+    private val ui = NeuralNetworkUI(
+        uiListener = this,
+        config = config
+    )
 
     init {
         SwingUtilities.invokeLater { ui }
     }
 
-    override fun onTrainButtonClicked(epochs: Int, learningRate: Double) {
-        val trainingPair = readFausettChars()
+    override fun onTrainButtonClicked(config: Config) {
+        val trainingPair = readFiles(
+            trainingFile = config.trainFile(),
+            targetFile = config.targetFile()
+        )
         val mlp = createMLP()
 
         mlp.train(
             inputs = trainingPair.first,
             targets = trainingPair.second,
-            epochs = epochs,
-            learningRate = learningRate
+            epochs = config.epochs(),
+            learningRate = config.learningRate()
         )
     }
 
     override fun onTestButtonClicked() {
-        val trainingPair = readFausettChars()
-        val mlp = createMLP()
-
-        val mse = mlp.test(trainingPair.first, trainingPair.second)
-        println("MSE: $mse")
+//        val trainingPair = readFiles()
+//        val mlp = createMLP()
+//
+//        val mse = mlp.test(trainingPair.first, trainingPair.second)
+//        println("MSE: $mse")
     }
 
     private fun updateMSE(epoch: Int, mse: Double) {
@@ -70,7 +78,7 @@ class Main : UIListener {
         )
     }
 
-    fun createLayer(
+    private fun createLayer(
         numInputs: Int,
         numNeurons: Int,
         activationFunction: (Double) -> Double
@@ -86,17 +94,20 @@ class Main : UIListener {
         return Layer(neurons, numInputs)
     }
 
-    fun readFausettChars(): Pair<List<List<Double>>, List<List<Double>>> {
+    private fun readFiles(
+        trainingFile: File?,
+        targetFile: File?,
+    ): Pair<List<List<Double>>, List<List<Double>>> {
         val trainChars = mutableListOf<List<Double>>()
         val targets = mutableListOf<List<Double>>()
 
-        File("caracteres-limpo.csv").forEachLine { line ->
+        trainingFile?.forEachLine { line ->
             val cleanedLine = line.cleanInput()
             val values = cleanedLine.split(",").map { it.toInt().toDouble() }.normalize()
             trainChars.add(values)
         }
 
-        File("caracteres-limpo-target.csv").forEachLine { line ->
+        targetFile?.forEachLine { line ->
             val cleanedLine = line.cleanInput()
             val values = cleanedLine.split(",").map { it.toInt().toDouble() }.normalize()
             targets.add(values)

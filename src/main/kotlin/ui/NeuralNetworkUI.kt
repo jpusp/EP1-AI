@@ -1,30 +1,38 @@
 package ui
 
+import config.Config
 import org.jfree.chart.ChartFactory
 import org.jfree.chart.ChartPanel
+import org.jfree.chart.axis.LogarithmicAxis
 import org.jfree.chart.labels.StandardXYToolTipGenerator
 import org.jfree.chart.plot.PlotOrientation
 import org.jfree.data.xy.XYSeries
 import org.jfree.data.xy.XYSeriesCollection
 import java.awt.GridLayout
+import java.io.File
 import javax.swing.*
 
 
 const val NoFileSelected = "Nenhum arquivo selecionado"
 
 class NeuralNetworkUI(
-    private val uiListener: UIListener
+    private val uiListener: UIListener,
+    private val config: Config
 ) : JFrame("Neural Network Configuration") {
     private val fileChooser = JFileChooser()
+    private var trainingFile: File? = null
+    private var targetFile: File? = null
+    private var testFile: File? = null
     private val trainingFileLabel = JLabel(NoFileSelected)
     private val targetFileLabel = JLabel(NoFileSelected)
     private val testFileLabel = JLabel(NoFileSelected)
     private val mseSeries = XYSeries("MSE")
-    private val epochsTextField = JTextField("500", 10)
+    private val epochsTextField = JTextField("", 10)
+    private val learningRateField = JTextField("0.2", 10)
     private val hiddenLayersTextField = JTextField("35", 10)
     private val outputLayersTextField = JTextField("7", 10)
 
-    private var epochs = 500
+    //private var epochs = 0
     private var learningRate = 0.2
 
     init {
@@ -47,15 +55,46 @@ class NeuralNetworkUI(
         row.add(
             createColumn().apply {
                 add(JButton("Selecionar Training File").apply {
-                    addActionListener { chooseFile(trainingFileLabel) }
+                    config.trainFile()?.run {
+                        trainingFile = this
+                        trainingFileLabel.text = this.path
+                    }
+                    addActionListener {
+                        trainingFile = chooseFile(trainingFileLabel)
+                    }
                 })
                 add(trainingFileLabel)
 
                 add(
-                    createRow().apply {
-                        add (JLabel("Épocas"))
-                        add(epochsTextField)
-                    }
+                    createInput(
+                        label = "Épocas: ",
+                        textField = epochsTextField,
+                        initialText = config.epochs().toString()
+                    )
+                )
+
+                add(
+                    createInput(
+                        label = "Taxa de aprendizado: ",
+                        textField = learningRateField,
+                        initialText = config.learningRate().toString()
+                    )
+                )
+
+                add(
+                    createInput(
+                        label = "Neurônios na camada escondida: ",
+                        textField = hiddenLayersTextField,
+                        initialText = config.hiddenLayerCount().toString()
+                    )
+                )
+
+                add(
+                    createInput(
+                        label = "Neurônios na camada saída: ",
+                        textField = outputLayersTextField,
+                        initialText = config.outputLayerCount().toString()
+                    )
                 )
             }
         )
@@ -63,7 +102,13 @@ class NeuralNetworkUI(
         row.add(
             createColumn().apply {
                 add(JButton("Selecionar Target File").apply {
-                    addActionListener { chooseFile(targetFileLabel) }
+                    config.targetFile()?.run {
+                        targetFile = this
+                        targetFileLabel.text = this.path
+                    }
+                    addActionListener {
+                        targetFile = chooseFile(targetFileLabel)
+                    }
                 })
                 add(targetFileLabel)
             }
@@ -78,13 +123,14 @@ class NeuralNetworkUI(
             }
         )
 
-        // Adicionando a linha ao contentPane
         add(row)
     }
 
     private fun setupTrainButton() {
         val trainButton = JButton("Train MLP").apply {
-            addActionListener { trainNetwork() }
+            addActionListener {
+                trainNetwork()
+            }
         }
         add(trainButton)
     }
@@ -113,6 +159,9 @@ class NeuralNetworkUI(
         val toolTipGenerator = StandardXYToolTipGenerator()
         plot.renderer.defaultToolTipGenerator = toolTipGenerator
 
+        val logAxis = LogarithmicAxis("MSE")
+        plot.rangeAxis = logAxis
+
         val chartPanel = ChartPanel(chart)
         add(chartPanel)
     }
@@ -121,19 +170,64 @@ class NeuralNetworkUI(
         mseSeries.add(epoch.toDouble(), mse)
     }
 
+    fun clearGraph() {
+        mseSeries.clear()
+    }
+
     private fun trainNetwork() {
-        uiListener.onTrainButtonClicked(epochs, learningRate)
+        clearGraph()
+        val epochs = epochsTextField.text.toIntOrNull() ?: 500
+        val learningRate = learningRateField.text.toDoubleOrNull() ?: 0.0
+        val hiddenLayerCount = hiddenLayersTextField.text.toIntOrNull() ?: 0
+        val outputLayerCount = outputLayersTextField.text.toIntOrNull() ?: 0
+
+        config.saveConfigs(
+            trainFile = trainingFile,
+            targetFile = targetFile,
+            testFile = testFile,
+            epochs = epochs,
+            learningRate = learningRate,
+            hiddenLayerCount = hiddenLayerCount,
+            outputLayerCount = outputLayerCount
+        )
+
+        if (epochs <= 0) {
+            showError("O número de épocas deve ser maior que zero")
+            return
+        }
+
+        if (learningRate <= 0.0) {
+            showError("A taxa de aprendizado deve ser maior que zero")
+            return
+        }
+
+        if (hiddenLayerCount <= 0) {
+            showError("O número de neurônios na camada escondida deve ser maior que zero")
+            return
+        }
+
+        if (outputLayerCount <= 0) {
+            showError("O número de neurônios na camada de saída deve ser maior que zero")
+            return
+        }
+
+        trainingFile?.let {
+            targetFile?.let {
+                uiListener.onTrainButtonClicked(config)
+            } ?: showError("Não foi selecionado o arquivo target")
+        } ?: showError("Não foi selecionado o arquivo de treinamento")
     }
 
     private fun testNetwork() {
         //uiListener.onTestButtonClicked()
     }
 
-    private fun chooseFile(fileLabel: JLabel) {
+    private fun chooseFile(fileLabel: JLabel): File? {
         val returnValue = fileChooser.showOpenDialog(this)
-        if (returnValue == JFileChooser.APPROVE_OPTION) {
+        return if (returnValue == JFileChooser.APPROVE_OPTION) {
             fileLabel.text = fileChooser.selectedFile.path
-        }
+            fileChooser.selectedFile
+        } else null
     }
 
     private fun createRow() = JPanel().apply {
@@ -141,8 +235,25 @@ class NeuralNetworkUI(
         alignmentX = LEFT_ALIGNMENT
     }
 
+    private fun createInput(
+        label: String,
+        textField: JTextField,
+        initialText: String
+    ): JPanel {
+        return createRow().apply {
+            add (JLabel(label))
+            add(textField)
+            textField.text = initialText
+        }
+    }
+
     private fun createColumn() = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         alignmentY = TOP_ALIGNMENT
+    }
+
+    private fun showError(message: String) {
+        JOptionPane.showMessageDialog(null, message, "Erro", JOptionPane.ERROR_MESSAGE)
+
     }
 }
