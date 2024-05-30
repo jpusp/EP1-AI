@@ -9,6 +9,7 @@ private const val TargetFilePathKey = "targetFilePath"
 private const val TestFilePathKey = "testFilePath"
 private const val EpochsKey = "epochs"
 private const val LearningRateKey = "learningRate"
+private const val KFoldsKey = "kFolds"
 private const val HiddenLayerCountKey = "hiddenLayer"
 private const val OutputLayerCountKey = "outputLayer"
 class Config {
@@ -22,31 +23,19 @@ class Config {
 
     fun trainFile() = loadFilePath(TrainFilePathKey)
 
-    fun saveTrainFilePath(path: File) = saveValue(TrainFilePathKey, path.path)
-
     fun targetFile() = loadFilePath(TargetFilePathKey)
-
-    fun saveTargetFilePath(path: File) = saveValue(TargetFilePathKey, path.path)
 
     fun testFile() = loadFilePath(TestFilePathKey)
 
-    fun saveTestFilePath(path: File) = saveValue(TestFilePathKey, path.path)
-
     fun epochs(): Int = loadValue<Number>(EpochsKey)?.toInt() ?: 0
-
-    fun saveEpochs(epochs: Int) = saveValue(EpochsKey, epochs)
 
     fun learningRate(): Double = loadValue(LearningRateKey) ?: 0.0
 
-    fun saveLearningRate(learningRate: Double) = saveValue(LearningRateKey, learningRate)
+    fun k(): Int = loadValue<Number>(KFoldsKey)?.toInt() ?: 0
 
     fun hiddenLayerCount() = loadValue<Number>(HiddenLayerCountKey)?.toInt() ?: 0
 
-    fun saveHiddenLayerCount(count: Int) = saveValue(HiddenLayerCountKey, count)
-
     fun outputLayerCount() = loadValue<Number>(OutputLayerCountKey)?.toInt() ?: 0
-
-    fun saveOutputLayerCount(count: Int) = saveValue(OutputLayerCountKey, count)
 
     fun saveConfigs(
         trainFile: File? = null,
@@ -54,6 +43,7 @@ class Config {
         testFile: File? = null,
         epochs: Int = 0,
         learningRate: Double = 0.0,
+        k: Int = 0,
         hiddenLayerCount: Int = 0,
         outputLayerCount: Int = 0
     ) {
@@ -63,6 +53,7 @@ class Config {
             putIfNotNull(TestFilePathKey, testFile?.path)
             put(EpochsKey, epochs)
             put(LearningRateKey, learningRate)
+            put(KFoldsKey, k)
             put(HiddenLayerCountKey, hiddenLayerCount)
             put(OutputLayerCountKey, outputLayerCount)
         }
@@ -72,11 +63,6 @@ class Config {
 
     private fun loadFilePath(key: String): File? {
         return loadValue<String>(key)?.let { File(it) }
-    }
-
-    private fun saveValue(key: String, obj: Any) {
-        configMap[key] = obj
-        storeConfigs()
     }
 
     private inline fun <reified T> loadValue(key: String): T?  {

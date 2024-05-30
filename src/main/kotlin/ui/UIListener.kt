@@ -4,7 +4,11 @@ import config.Config
 
 interface UIListener {
 
-    fun onTrainButtonClicked(config: Config)
+    fun onTrainButtonClick(config: Config)
+
+    fun onCrossValidationButtonClick(config: Config)
+
+    fun onEarlyStopButtonClick(config: Config)
 
     fun onTestButtonClicked()
 }

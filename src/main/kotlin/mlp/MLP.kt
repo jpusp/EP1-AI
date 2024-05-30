@@ -5,7 +5,7 @@ import java.io.File
 
 class MLP(
     val layers: List<Layer>,
-    val onMSECalculated: (Int, Double) -> Unit
+    val onMSECalculated: (Int, Int, Double) -> Unit
 ) {
     fun forward(input: List<Double>): List<Double> {
         var currentOutput = input
@@ -19,6 +19,7 @@ class MLP(
         inputs: List<List<Double>>,
         targets: List<List<Double>>,
         epochs: Int,
+        epochsOffset: Int = 0,
         learningRate: Double
     ) {
         for (epoch in 1..epochs) {
@@ -37,38 +38,10 @@ class MLP(
             }
 
             val mse = sumSquaredErrors / totalCount
-            onMSECalculated(epoch, mse)
+            onMSECalculated(epoch, epochsOffset, mse)
         }
 
         saveWeights()
-    }
-
-    fun crossValidate(
-        inputs: List<List<Double>>,
-        targets: List<List<Double>>,
-        k: Int,
-        epochs: Int,
-        learningRate: Double
-    ): Double {
-        val foldSize = inputs.size / k
-        var totalMSE = 0.0
-
-        for (i in 0 until k) {
-            val validationStart = i * foldSize
-            val validationEnd = validationStart + foldSize
-
-            val trainingInputs = inputs.take(validationStart) + inputs.drop(validationEnd)
-            val trainingTargets = targets.take(validationStart) + targets.drop(validationEnd)
-
-            val validationInputs = inputs.subList(validationStart, validationEnd)
-            val validationTargets = targets.subList(validationStart, validationEnd)
-
-            val mlp = createMLP() // Certifique-se de ter um método para criar uma nova instância de MLP
-            mlp.train(trainingInputs, trainingTargets, epochs, learningRate)
-            totalMSE += mlp.test(validationInputs, validationTargets)
-        }
-
-        return totalMSE / k
     }
 
     fun trainWithEarlyStopping(
@@ -84,7 +57,12 @@ class MLP(
         var epochsWithoutImprovement = 0
 
         for (epoch in 1..epochs) {
-            train(inputs, targets, 1, learningRate)
+            train(
+                inputs = inputs,
+                targets = targets,
+                epochs = 1,
+                learningRate = learningRate
+            )
             val mse = test(validationInputs, validationTargets)
 
             if (mse < bestMSE) {
@@ -99,7 +77,6 @@ class MLP(
             }
         }
     }
-
 
     private fun backpropagate(error: List<Double>, learningRate: Double) {
         var currentError = error

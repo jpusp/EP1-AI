@@ -23,19 +23,57 @@ class Main : UIListener {
         SwingUtilities.invokeLater { ui }
     }
 
-    override fun onTrainButtonClicked(config: Config) {
+    override fun onTrainButtonClick(config: Config) {
         val trainingPair = readFiles(
             trainingFile = config.trainFile(),
             targetFile = config.targetFile()
         )
-        val mlp = createMLP()
+
+        val inputs = trainingPair.first
+        val targets = trainingPair.second
+
+        val mlp = createMLP(inputs.first().size)
 
         mlp.train(
-            inputs = trainingPair.first,
-            targets = trainingPair.second,
+            inputs = inputs,
+            targets = targets,
             epochs = config.epochs(),
             learningRate = config.learningRate()
         )
+    }
+
+    override fun onCrossValidationButtonClick(config: Config) {
+        val trainingPair = readFiles(
+            trainingFile = config.trainFile(),
+            targetFile = config.targetFile()
+        )
+
+        crossValidate(
+            inputs = trainingPair.first,
+            targets = trainingPair.second,
+            k = config.k(),
+            epochs = config.epochs(),
+            learningRate = config.learningRate()
+        )
+    }
+
+    override fun onEarlyStopButtonClick(config: Config) {
+        val trainingPair = readFiles(
+            trainingFile = config.trainFile(),
+            targetFile = config.targetFile()
+        )
+
+        val inputs = trainingPair.first
+        val targets = trainingPair.second
+
+        val mlp = createMLP(inputs.first().size)
+
+//        mlp.trainWithEarlyStopping(
+//            inputs = inputs,
+//            targets = targets,
+//            epochs = config.epochs(),
+//            learningRate = config.learningRate()
+//        )
     }
 
     override fun onTestButtonClicked() {
@@ -46,26 +84,61 @@ class Main : UIListener {
 //        println("MSE: $mse")
     }
 
-    private fun updateMSE(epoch: Int, mse: Double) {
-        println("$epoch; $mse")
-        ui.updateMSE(epoch, mse)
+    fun crossValidate(
+        inputs: List<List<Double>>,
+        targets: List<List<Double>>,
+        k: Int,
+        epochs: Int,
+        learningRate: Double
+    ): Double {
+        val foldSize = inputs.size / k
+        var totalMSE = 0.0
+
+        for (i in 0 until k) {
+            val validationStart = i * foldSize
+            val validationEnd = validationStart + foldSize
+
+            val trainingInputs = inputs.take(validationStart) + inputs.drop(validationEnd)
+            val trainingTargets = targets.take(validationStart) + targets.drop(validationEnd)
+
+            val validationInputs = inputs.subList(validationStart, validationEnd)
+            val validationTargets = targets.subList(validationStart, validationEnd)
+
+            val mlp = createMLP(inputs.first().size)
+            mlp.train(
+                trainingInputs,
+                trainingTargets,
+                epochs,
+                epochsOffset = epochs * i,
+                learningRate
+            )
+            totalMSE += mlp.test(validationInputs, validationTargets)
+        }
+
+        return totalMSE / k
     }
 
-    fun createMLP(): MLP {
-        val width = 7
-        val height = 9
-        val numNeuronsHiddenLayer = 35
-        val numNeuronsOutputLayer = 7
+    private fun updateMSE(
+        epoch: Int,
+        epochOffset: Int = 0,
+        mse: Double
+    ) {
+        println("${epoch + epochOffset}; $mse")
+        ui.updateMSE(epoch + epochOffset, mse)
+    }
 
+    private fun createMLP(
+        initialSize: Int
+    ): MLP {
         val hiddenLayer = createLayer(
-            numInputs = width * height,
-            numNeurons = numNeuronsHiddenLayer,
+            numInputs = initialSize,
+            numNeurons = config.hiddenLayerCount(),
             activationFunction = ::sigmoid
         )
 
         val outputLayer = createLayer(
-            numInputs = numNeuronsHiddenLayer,
-            numNeurons = numNeuronsOutputLayer,
+            numInputs = config.hiddenLayerCount(),
+            numNeurons = config.outputLayerCount(),
             activationFunction = ::sigmoid
         )
 
@@ -74,7 +147,9 @@ class Main : UIListener {
                 hiddenLayer,
                 outputLayer
             ),
-            onMSECalculated = ::updateMSE
+            onMSECalculated = { epoch, epochOffset, mse ->
+                updateMSE(epoch, epochOffset, mse)
+            }
         )
     }
 
