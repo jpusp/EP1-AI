@@ -1,10 +1,16 @@
 package ui
 
+import calculateAccuracy
+import calculateConfusionMatrix
+import calculatePredictionError
+import calculateStandardDeviation
 import config.Config
+import functions.saveWeightsToFile
 import mlp.Layer
 import mlp.MLP
 import mlp.Neuron
 import functions.sigmoid
+import functions.splitData
 import java.io.File
 import javax.swing.SwingUtilities
 
@@ -66,22 +72,50 @@ class Main : UIListener {
         val inputs = trainingPair.first
         val targets = trainingPair.second
 
+        val trainingSets = splitData(inputs, targets)
+
         val mlp = createMLP(inputs.first().size)
 
-//        mlp.trainWithEarlyStopping(
-//            inputs = inputs,
-//            targets = targets,
-//            epochs = config.epochs(),
-//            learningRate = config.learningRate()
-//        )
+        mlp.trainWithEarlyStopping(
+            inputs = trainingSets.trainingInput,
+            targets = trainingSets.trainingTarget,
+            validationInputs = trainingSets.validationInput,
+            validationTargets = trainingSets.validationTarget,
+            epochs = config.epochs(),
+            learningRate = config.learningRate(),
+            patience = 50
+        )
     }
 
-    override fun onTestButtonClicked() {
-//        val trainingPair = readFiles()
-//        val mlp = createMLP()
-//
-//        val mse = mlp.test(trainingPair.first, trainingPair.second)
-//        println("MSE: $mse")
+    override fun onTestButtonClicked(
+        hiddenWeightsPath: String,
+        outputWeightsPath: String
+    ) {
+        val testPair = readFiles(
+            trainingFile = config.testFile(),
+            targetFile = config.targetFile()
+        )
+
+        val inputs = testPair.first
+        val trueLabels = testPair.second.map { it.indexOf(it.maxOrNull() ?: 0.0) }
+
+        val mlp = createMLP(
+            initialSize = inputs.firstOrNull()?.size ?: 0,
+            loadWeights = true,
+            hiddenWeightsPath = hiddenWeightsPath,
+            outputWeightsPath = outputWeightsPath,
+        )
+
+        val predictedLabels = mlp.predict(inputs)
+        val predictionErrors = calculatePredictionError(trueLabels, predictedLabels)
+
+        val confusionMatrix = calculateConfusionMatrix(trueLabels, predictedLabels, config.outputLayerCount())
+        val accuracy = calculateAccuracy(confusionMatrix)
+        val stdDeviation = calculateStandardDeviation(predictionErrors)
+
+        println("Matriz de Confusão: ${confusionMatrix.contentDeepToString()}")
+        println("Acurácia: $accuracy")
+        println("Desvio Padrão: $stdDeviation")
     }
 
     fun crossValidate(
@@ -93,6 +127,9 @@ class Main : UIListener {
     ): Double {
         val foldSize = inputs.size / k
         var totalMSE = 0.0
+        var bestMSE = Double.MAX_VALUE
+        var bestWeightsHiddenLayer: List<Pair<List<Double>, Double>>? = null
+        var bestWeightsOutputLayer: List<Pair<List<Double>, Double>>? = null
 
         for (i in 0 until k) {
             val validationStart = i * foldSize
@@ -112,8 +149,19 @@ class Main : UIListener {
                 epochsOffset = epochs * i,
                 learningRate
             )
-            totalMSE += mlp.test(validationInputs, validationTargets)
+
+            val mse = mlp.test(validationInputs, validationTargets)
+            totalMSE += mse
+
+            if (mse < bestMSE) {
+                bestMSE = mse
+                bestWeightsHiddenLayer = mlp.getLayerWeights(0)
+                bestWeightsOutputLayer = mlp.getLayerWeights(1)
+            }
         }
+
+        bestWeightsHiddenLayer?.let { saveWeightsToFile(it, "cross_validation_hidden_weights.txt") }
+        bestWeightsOutputLayer?.let { saveWeightsToFile(it, "cross_validation_output_weights.txt") }
 
         return totalMSE / k
     }
@@ -128,7 +176,10 @@ class Main : UIListener {
     }
 
     private fun createMLP(
-        initialSize: Int
+        initialSize: Int,
+        loadWeights: Boolean = false,
+        hiddenWeightsPath: String = "hidden_weights.txt",
+        outputWeightsPath: String = "output_weights.txt"
     ): MLP {
         val hiddenLayer = createLayer(
             numInputs = initialSize,
@@ -142,7 +193,7 @@ class Main : UIListener {
             activationFunction = ::sigmoid
         )
 
-        return MLP(
+        val mlp =  MLP(
             layers = listOf(
                 hiddenLayer,
                 outputLayer
@@ -151,6 +202,12 @@ class Main : UIListener {
                 updateMSE(epoch, epochOffset, mse)
             }
         )
+
+        if (loadWeights) {
+            mlp.loadWeights(hiddenWeightsPath, outputWeightsPath)
+        }
+
+        return mlp
     }
 
     private fun createLayer(

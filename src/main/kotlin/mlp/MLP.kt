@@ -1,6 +1,8 @@
 package mlp
 
 import functions.calculateMSE
+import functions.loadWeightsFromFile
+import functions.saveWeightsToFile
 import java.io.File
 
 class MLP(
@@ -41,7 +43,10 @@ class MLP(
             onMSECalculated(epoch, epochsOffset, mse)
         }
 
-        saveWeights()
+        saveWeights(
+            hiddenLayerPath = "normal_hidden_weights.txt",
+            outputLayerPath = "normal_output_weights.txt"
+        )
     }
 
     fun trainWithEarlyStopping(
@@ -51,12 +56,17 @@ class MLP(
         validationTargets: List<List<Double>>,
         epochs: Int,
         learningRate: Double,
-        patience: Int
+        patience: Int,
+
     ) {
+        val minDelta: Double = 1e-4
         var bestMSE = Double.MAX_VALUE
         var epochsWithoutImprovement = 0
+        var bestWeightsHiddenLayer: List<Pair<List<Double>, Double>>? = null
+        var bestWeightsOutputLayer: List<Pair<List<Double>, Double>>? = null
 
         for (epoch in 1..epochs) {
+            print("Época: $epoch - ")
             train(
                 inputs = inputs,
                 targets = targets,
@@ -65,9 +75,11 @@ class MLP(
             )
             val mse = test(validationInputs, validationTargets)
 
-            if (mse < bestMSE) {
+            if (bestMSE - mse > minDelta) {
                 bestMSE = mse
                 epochsWithoutImprovement = 0
+                bestWeightsHiddenLayer = getLayerWeights(0)
+                bestWeightsOutputLayer = getLayerWeights(1)
             } else {
                 epochsWithoutImprovement++
                 if (epochsWithoutImprovement >= patience) {
@@ -76,6 +88,9 @@ class MLP(
                 }
             }
         }
+
+        bestWeightsHiddenLayer?.let { saveWeightsToFile(it, "early_stopping_hidden_weights.txt") }
+        bestWeightsOutputLayer?.let { saveWeightsToFile(it, "early_stopping_output_weights.txt") }
     }
 
     private fun backpropagate(error: List<Double>, learningRate: Double) {
@@ -90,15 +105,62 @@ class MLP(
         return calculateMSE(targets, predictions)
     }
 
-    private fun saveWeights() {
-        layers.forEachIndexed { index, layer ->
-            File("layer${index+1}_weights.txt").bufferedWriter().use { out ->
-                layer.neurons.forEach { neuron ->
-                    out.write(neuron.weights.joinToString(",") + "\n")
-                }
-                out.write(layer.neurons.map { it.bias }.joinToString(",") + "\n")
-            }
+    fun predict(inputs: List<List<Double>>): List<Int> {
+        return inputs.map { input ->
+            val output = forward(input)
+            output.indexOf(output.maxOrNull() ?: 0.0)
         }
     }
+
+    fun loadWeights(hiddenLayerPath: String, outputLayerPath: String) {
+        val hiddenLayerWeights = loadWeightsFromFile(hiddenLayerPath)
+        val outputLayerWeights = loadWeightsFromFile(outputLayerPath)
+
+        layers[0].neurons.forEachIndexed { index, neuron ->
+            neuron.weights = hiddenLayerWeights[index].first.toMutableList()
+            neuron.bias = hiddenLayerWeights[index].second
+        }
+
+        layers[1].neurons.forEachIndexed { index, neuron ->
+            neuron.weights = outputLayerWeights[index].first.toMutableList()
+            neuron.bias = outputLayerWeights[index].second
+        }
+    }
+
+    fun getLayerWeights(layerIndex: Int): List<Pair<List<Double>, Double>> {
+        return layers[layerIndex].neurons.map { neuron ->
+            Pair(neuron.weights.toList(), neuron.bias)
+        }
+    }
+
+    private fun saveWeights(hiddenLayerPath: String, outputLayerPath: String) {
+        saveWeightsToFile(getLayerWeights(0), hiddenLayerPath)
+        saveWeightsToFile(getLayerWeights(1), outputLayerPath)
+//        File(hiddenLayerPath).bufferedWriter().use { out ->
+//            layers[0].neurons.forEach { neuron ->
+//                out.write(neuron.weights.joinToString(",") + "\n")
+//            }
+//            out.write(layers[0].neurons.map { it.bias }.joinToString(",") + "\n")
+//        }
+//
+//        File(outputLayerPath).bufferedWriter().use { out ->
+//            layers[1].neurons.forEach { neuron ->
+//                out.write(neuron.weights.joinToString(",") + "\n")
+//            }
+//            out.write(layers[1].neurons.map { it.bias }.joinToString(",") + "\n")
+//        }
+    }
+
+//    private fun saveWeights(preffix: String) {
+//        layers.forEachIndexed { index, layer ->
+//            val layerId = if (index == 0) "hidden" else "output"
+//            File("$preffix${layerId}_weights.txt").bufferedWriter().use { out ->
+//                layer.neurons.forEach { neuron ->
+//                    out.write(neuron.weights.joinToString(",") + "\n")
+//                }
+//                out.write(layer.neurons.map { it.bias }.joinToString(",") + "\n")
+//            }
+//        }
+//    }
 
 }

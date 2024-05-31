@@ -41,6 +41,7 @@ class NeuralNetworkUI(
 
         add(createTrainingSection())
         add(createTrainingButtons())
+        add(createTestingButtons())
         add(createGraph())
 
         isVisible = true
@@ -122,7 +123,13 @@ class NeuralNetworkUI(
         row.add(
             createColumn().apply {
                 add(JButton("Selecionar Test File").apply {
-                    addActionListener { chooseFile(testFileLabel) }
+                    config.testFile()?.run {
+                        testFile = this
+                        testFileLabel.text = this.path
+                    }
+                    addActionListener {
+                        testFile = chooseFile(testFileLabel)
+                    }
                 })
                 add(testFileLabel)
             }
@@ -149,14 +156,40 @@ class NeuralNetworkUI(
                     addActionListener {
                         trainEarlyStopping()
                     }
-                },
-                JButton("Testar MLP").apply {
-                    addActionListener {
-                        testNetwork()
-                    }
                 }
             ).forEach { panel.add(it) }
 
+        }
+    }
+
+    private fun createTestingButtons(): JPanel {
+        return JPanel(GridLayout(1, 3, 10, 10)).also { panel ->
+            listOf(
+                JButton("Testar MLP").apply {
+                    addActionListener {
+                        testNetwork(
+                            hiddenWeightsPath = "normal_hidden_weights.txt",
+                            outputWeightsPath = "normal_output_weights.txt"
+                        )
+                    }
+                },
+                JButton("Testar MLP Validação Cruzada").apply {
+                    addActionListener {
+                        testNetwork(
+                            hiddenWeightsPath = "cross_validation_hidden_weights.txt",
+                            outputWeightsPath = "cross_validation_output_weights.txt"
+                        )
+                    }
+                },
+                JButton("Testar MLP Parada Antecipada").apply {
+                    addActionListener {
+                        testNetwork(
+                            hiddenWeightsPath = "early_stopping_hidden_weights.txt",
+                            outputWeightsPath = "early_stopping_output_weights.txt"
+                        )
+                    }
+                }
+            ).forEach { panel.add(it) }
         }
     }
 
@@ -212,6 +245,7 @@ class NeuralNetworkUI(
     private fun trainNetwork(
         action: (Config) -> Unit
     ) {
+        clearGraph()
         val config = updateConfig()
         val isInputValid = validateInputs(config)
 
@@ -224,12 +258,18 @@ class NeuralNetworkUI(
         }
     }
 
-    private fun testNetwork() {
-        //uiListener.onTestButtonClicked()
+    private fun testNetwork(
+        hiddenWeightsPath: String,
+        outputWeightsPath: String
+    ) {
+        updateConfig()
+        uiListener.onTestButtonClicked(
+            hiddenWeightsPath = hiddenWeightsPath,
+            outputWeightsPath = outputWeightsPath
+        )
     }
 
     private fun updateConfig(): Config {
-        clearGraph()
         val epochs = epochsTextField.text.toIntOrNull() ?: 500
         val learningRate = learningRateField.text.toDoubleOrNull() ?: 0.0
         val hiddenLayerCount = hiddenLayersTextField.text.toIntOrNull() ?: 0

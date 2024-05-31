@@ -1,1 +1,1 @@
-{"epochs":500,"learningRate":0.2,"hiddenLayer":35,"outputLayer":7,"trainFilePath":"/Users/joadeoliveir/dev/usp/IA/EP1-AI/caracteres-limpo.csv","targetFilePath":"/Users/joadeoliveir/dev/usp/IA/EP1-AI/caracteres-limpo-target.csv","kFolds":10}
+{"epochs":60,"learningRate":0.4,"hiddenLayer":10,"outputLayer":7,"trainFilePath":"/Users/joadeoliveir/dev/usp/IA/EP1-AI/caracteres-limpo.csv","targetFilePath":"/Users/joadeoliveir/dev/usp/IA/EP1-AI/caracteres-limpo-target.csv","kFolds":10,"testFilePath":"/Users/joadeoliveir/dev/usp/IA/EP1-AI/caracteres-limpo.csv"}

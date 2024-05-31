@@ -1,7 +1,7 @@
 package mlp
 
 class Neuron(
-    val weights: MutableList<Double>,
+    var weights: MutableList<Double>,
     var bias: Double,
     val activationFunction: (Double) -> Double
 ) {
