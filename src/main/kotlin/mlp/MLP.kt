@@ -3,7 +3,6 @@ package mlp
 import functions.calculateMSE
 import functions.loadWeightsFromFile
 import functions.saveWeightsToFile
-import java.io.File
 
 class MLP(
     val layers: List<Layer>,
@@ -59,7 +58,7 @@ class MLP(
         patience: Int,
 
     ) {
-        val minDelta: Double = 1e-4
+        val minDelta = 1e-4
         var bestMSE = Double.MAX_VALUE
         var epochsWithoutImprovement = 0
         var bestWeightsHiddenLayer: List<Pair<List<Double>, Double>>? = null
@@ -105,10 +104,9 @@ class MLP(
         return calculateMSE(targets, predictions)
     }
 
-    fun predict(inputs: List<List<Double>>): List<Int> {
+    fun predict(inputs: List<List<Double>>): List<List<Double>> {
         return inputs.map { input ->
-            val output = forward(input)
-            output.indexOf(output.maxOrNull() ?: 0.0)
+            forward(input)
         }
     }
 
@@ -136,31 +134,5 @@ class MLP(
     private fun saveWeights(hiddenLayerPath: String, outputLayerPath: String) {
         saveWeightsToFile(getLayerWeights(0), hiddenLayerPath)
         saveWeightsToFile(getLayerWeights(1), outputLayerPath)
-//        File(hiddenLayerPath).bufferedWriter().use { out ->
-//            layers[0].neurons.forEach { neuron ->
-//                out.write(neuron.weights.joinToString(",") + "\n")
-//            }
-//            out.write(layers[0].neurons.map { it.bias }.joinToString(",") + "\n")
-//        }
-//
-//        File(outputLayerPath).bufferedWriter().use { out ->
-//            layers[1].neurons.forEach { neuron ->
-//                out.write(neuron.weights.joinToString(",") + "\n")
-//            }
-//            out.write(layers[1].neurons.map { it.bias }.joinToString(",") + "\n")
-//        }
     }
-
-//    private fun saveWeights(preffix: String) {
-//        layers.forEachIndexed { index, layer ->
-//            val layerId = if (index == 0) "hidden" else "output"
-//            File("$preffix${layerId}_weights.txt").bufferedWriter().use { out ->
-//                layer.neurons.forEach { neuron ->
-//                    out.write(neuron.weights.joinToString(",") + "\n")
-//                }
-//                out.write(layer.neurons.map { it.bias }.joinToString(",") + "\n")
-//            }
-//        }
-//    }
-
 }
