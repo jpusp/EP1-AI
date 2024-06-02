@@ -8,7 +8,7 @@ fun loadWeightsFromFile(path: String): List<Pair<List<Double>, Double>> {
 
     for (i in lines.indices step 2) {
         val w = lines[i].split(",").map(String::toDouble)
-        val b = lines[i + 1].toDouble()
+        val b = lines[i + 1].split(",").map(String::toDouble).first()
         weights.add(Pair(w, b))
     }
 
