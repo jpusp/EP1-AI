@@ -1,9 +1,11 @@
 package mlp
 
+import model.ActivationFunction
+
 class Neuron(
     var weights: MutableList<Double>,
     var bias: Double,
-    val activationFunction: (Double) -> Double
+    val activationFunction: ActivationFunction
 ) {
     var lastActivation: Double = 0.0
     var lastInputs: List<Double> = emptyList()
@@ -15,7 +17,7 @@ class Neuron(
             .sum()
             .plus(bias)
 
-        lastActivation = activationFunction(totalSum)
+        lastActivation = activationFunction.function(totalSum)
         return lastActivation
     }
 }

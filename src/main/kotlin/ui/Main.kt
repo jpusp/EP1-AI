@@ -2,17 +2,17 @@ package ui
 
 import calculateAccuracy
 import calculateConfusionMatrix
-import calculatePredictionError
 import calculateStandardDeviation
 import config.Config
-import functions.saveWeightsToFile
+import functions.*
 import mlp.Layer
 import mlp.MLP
 import mlp.Neuron
-import functions.sigmoid
-import functions.splitData
+import model.ActivationFunction
 import java.io.File
+import java.util.*
 import javax.swing.SwingUtilities
+import kotlin.math.sqrt
 
 fun main() {
     Main()
@@ -32,7 +32,8 @@ class Main : UIListener {
     override fun onTrainButtonClick(config: Config) {
         val trainingPair = readFiles(
             trainingFile = config.trainFile(),
-            targetFile = config.targetFile()
+            targetFile = config.targetFile(),
+            action = { it.dropLast(config.testLinesCount()) }
         )
 
         val inputs = trainingPair.first
@@ -51,7 +52,8 @@ class Main : UIListener {
     override fun onCrossValidationButtonClick(config: Config) {
         val trainingPair = readFiles(
             trainingFile = config.trainFile(),
-            targetFile = config.targetFile()
+            targetFile = config.targetFile(),
+            action = { it.dropLast(config.testLinesCount()) }
         )
 
         crossValidate(
@@ -66,7 +68,8 @@ class Main : UIListener {
     override fun onEarlyStopButtonClick(config: Config) {
         val trainingPair = readFiles(
             trainingFile = config.trainFile(),
-            targetFile = config.targetFile()
+            targetFile = config.targetFile(),
+            action = { it.dropLast(config.testLinesCount()) }
         )
 
         val inputs = trainingPair.first
@@ -91,13 +94,17 @@ class Main : UIListener {
         hiddenWeightsPath: String,
         outputWeightsPath: String
     ) {
+        val alphabet = ('A'..'Z').toList()
         val testPair = readFiles(
-            trainingFile = config.testFile(),
-            targetFile = config.targetFile()
+            trainingFile = config.trainFile(),
+            targetFile = config.targetFile(),
+            action = { it.takeLast(config.testLinesCount()) }
         )
 
         val inputs = testPair.first
-        val trueLabels = testPair.second.map { it.indexOf(it.maxOrNull() ?: 0.0) }
+        val trueLabels = testPair.second
+            .takeLast(config.testLinesCount())
+            .map { oneHotToChar(it) }
 
         val mlp = createMLP(
             initialSize = inputs.firstOrNull()?.size ?: 0,
@@ -106,16 +113,17 @@ class Main : UIListener {
             outputWeightsPath = outputWeightsPath,
         )
 
-        val predictedLabels = mlp.predict(inputs)
-        val predictionErrors = calculatePredictionError(trueLabels, predictedLabels)
+        val predictedLabels = mlp.predict(inputs).map { oneHotToChar(it) }
 
-        val confusionMatrix = calculateConfusionMatrix(trueLabels, predictedLabels, config.outputLayerCount())
+        val confusionMatrix = calculateConfusionMatrix(trueLabels, predictedLabels, alphabet)
         val accuracy = calculateAccuracy(confusionMatrix)
-        val stdDeviation = calculateStandardDeviation(predictionErrors)
+        val stdDeviation = calculateStandardDeviation(predictedLabels.map { it.toDouble() })
 
         println("Matriz de Confusão: ${confusionMatrix.contentDeepToString()}")
         println("Acurácia: $accuracy")
         println("Desvio Padrão: $stdDeviation")
+
+        displayConfusionMatrixWithJFreeChart(confusionMatrix, alphabet)
     }
 
     fun crossValidate(
@@ -181,16 +189,18 @@ class Main : UIListener {
         hiddenWeightsPath: String = "hidden_weights.txt",
         outputWeightsPath: String = "output_weights.txt"
     ): MLP {
+        val activationFunction = ui.getSelectedActivationFunction()
+
         val hiddenLayer = createLayer(
             numInputs = initialSize,
             numNeurons = config.hiddenLayerCount(),
-            activationFunction = ::sigmoid
+            activationFunction = activationFunction
         )
 
         val outputLayer = createLayer(
             numInputs = config.hiddenLayerCount(),
             numNeurons = config.outputLayerCount(),
-            activationFunction = ::sigmoid
+            activationFunction = activationFunction
         )
 
         val mlp =  MLP(
@@ -213,11 +223,17 @@ class Main : UIListener {
     private fun createLayer(
         numInputs: Int,
         numNeurons: Int,
-        activationFunction: (Double) -> Double
+        activationFunction: ActivationFunction
     ): Layer {
         val neurons = (1..numNeurons).map {
+            val weights = if (activationFunction == reluActivation) {
+                MutableList(numInputs) { createRandomNumberReLU(numInputs) }
+            } else {
+                MutableList(numInputs) { createRandomNumber() }
+            }
+
             Neuron(
-                weights = MutableList(numInputs) { createRandomNumber() },
+                weights = weights,
                 bias = createRandomNumber(),
                 activationFunction = activationFunction
             )
@@ -226,33 +242,14 @@ class Main : UIListener {
         return Layer(neurons, numInputs)
     }
 
-    private fun readFiles(
-        trainingFile: File?,
-        targetFile: File?,
-    ): Pair<List<List<Double>>, List<List<Double>>> {
-        val trainChars = mutableListOf<List<Double>>()
-        val targets = mutableListOf<List<Double>>()
-
-        trainingFile?.forEachLine { line ->
-            val cleanedLine = line.cleanInput()
-            val values = cleanedLine.split(",").map { it.toInt().toDouble() }.normalize()
-            trainChars.add(values)
-        }
-
-        targetFile?.forEachLine { line ->
-            val cleanedLine = line.cleanInput()
-            val values = cleanedLine.split(",").map { it.toInt().toDouble() }.normalize()
-            targets.add(values)
-        }
-
-        return Pair(trainChars, targets)
-    }
-
     fun List<Double>.normalize(): List<Double> {
         return map { if (it == -1.0) 0.0 else 1.0 }
     }
 
-    fun String.cleanInput(): String = this.replace("\uFEFF", "")
+    private fun createRandomNumber(): Double = kotlin.random.Random.nextDouble() * 0.1 - 0.05
 
-    private fun createRandomNumber(): Double = Math.random() * 0.1 - 0.05
+    private fun createRandomNumberReLU(numInputs: Int): Double {
+        val random = Random()
+        return random.nextGaussian() * sqrt(2.0 / numInputs)
+    }
 }
