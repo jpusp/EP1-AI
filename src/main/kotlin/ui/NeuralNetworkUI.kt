@@ -1,13 +1,19 @@
 package ui
 
 import config.Config
+import functions.*
+import model.ActivationFunction
 import org.jfree.chart.ChartFactory
 import org.jfree.chart.ChartPanel
-import org.jfree.chart.axis.LogarithmicAxis
+import org.jfree.chart.axis.*
 import org.jfree.chart.labels.StandardXYToolTipGenerator
 import org.jfree.chart.plot.PlotOrientation
 import org.jfree.data.xy.XYSeries
 import org.jfree.data.xy.XYSeriesCollection
+import ui.components.chooseFile
+import ui.components.createColumn
+import ui.components.createInput
+import ui.components.showError
 import java.awt.GridLayout
 import java.io.File
 import javax.swing.*
@@ -19,19 +25,33 @@ class NeuralNetworkUI(
     private val uiListener: UIListener,
     private val config: Config
 ) : JFrame("Neural Network Configuration") {
-    private val fileChooser = JFileChooser()
     private var trainingFile: File? = null
     private var targetFile: File? = null
     private var testFile: File? = null
     private val trainingFileLabel = JLabel(NoFileSelected)
     private val targetFileLabel = JLabel(NoFileSelected)
-    private val testFileLabel = JLabel(NoFileSelected)
     private val mseSeries = XYSeries("MSE")
     private val epochsTextField = JTextField("", 10)
     private val learningRateField = JTextField("0.2", 10)
     private val kFoldsField = JTextField("10", 10)
     private val hiddenLayersTextField = JTextField("35", 10)
     private val outputLayersTextField = JTextField("7", 10)
+    private val textLinesTextField = JTextField("130", 10)
+    private val activationButtonGroup = ButtonGroup()
+
+    private val activationFunctions = listOf(
+        "Sigmoid" to sigmoidActivation,
+        "ReLU" to reluActivation,
+        "TanH" to tanhActivation,
+        "Swish" to swishActivation,
+        "SoftPlus" to softplusActivation
+    )
+
+    private val activationRadioButtons = activationFunctions.map { (name, _) ->
+        JRadioButton(name).apply {
+            activationButtonGroup.add(this)
+        }
+    }
 
     init {
         setSize(1000, 600)
@@ -48,7 +68,7 @@ class NeuralNetworkUI(
     }
 
     private fun createTrainingSection(): JPanel {
-        val row = JPanel(GridLayout(1, 3, 10, 10))
+        val row = JPanel(GridLayout(1, 2, 10, 10))
 
         row.add(
             createColumn().apply {
@@ -58,10 +78,21 @@ class NeuralNetworkUI(
                         trainingFileLabel.text = this.path
                     }
                     addActionListener {
-                        trainingFile = chooseFile(trainingFileLabel)
+                        trainingFile = chooseFile(trainingFileLabel, this@NeuralNetworkUI)
                     }
                 })
                 add(trainingFileLabel)
+
+                add(JButton("Selecionar Target File").apply {
+                    config.targetFile()?.run {
+                        targetFile = this
+                        targetFileLabel.text = this.path
+                    }
+                    addActionListener {
+                        targetFile = chooseFile(targetFileLabel, this@NeuralNetworkUI)
+                    }
+                })
+                add(targetFileLabel)
 
                 add(
                     createInput(
@@ -96,6 +127,10 @@ class NeuralNetworkUI(
                 )
 
                 add(
+                    createActivationFunctionSelection()
+                )
+
+                add(
                     createInput(
                         label = "k: ",
                         textField = kFoldsField,
@@ -107,31 +142,14 @@ class NeuralNetworkUI(
 
         row.add(
             createColumn().apply {
-                add(JButton("Selecionar Target File").apply {
-                    config.targetFile()?.run {
-                        targetFile = this
-                        targetFileLabel.text = this.path
-                    }
-                    addActionListener {
-                        targetFile = chooseFile(targetFileLabel)
-                    }
-                })
-                add(targetFileLabel)
-            }
-        )
-
-        row.add(
-            createColumn().apply {
-                add(JButton("Selecionar Test File").apply {
-                    config.testFile()?.run {
-                        testFile = this
-                        testFileLabel.text = this.path
-                    }
-                    addActionListener {
-                        testFile = chooseFile(testFileLabel)
-                    }
-                })
-                add(testFileLabel)
+                add(JLabel("Quantas linhas do final do arquivo devem ser usadas para teste?"))
+                add(
+                    createInput(
+                        label = "Linhas: ",
+                        textField = textLinesTextField,
+                        initialText = config.testLinesCount().toString()
+                    )
+                )
             }
         )
 
@@ -139,7 +157,7 @@ class NeuralNetworkUI(
     }
 
     private fun createTrainingButtons(): JPanel {
-        return JPanel(GridLayout(1, 4, 10, 10)).also { panel ->
+        return JPanel(GridLayout(1, 3, 10, 10)).also { panel ->
 
             listOf(
                 JButton("Treinar MLP").apply {
@@ -216,6 +234,20 @@ class NeuralNetworkUI(
         return ChartPanel(chart)
     }
 
+    private fun createActivationFunctionSelection(): JPanel {
+        val panel = JPanel()
+        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+        panel.add(JLabel("Função de Ativação: "))
+
+        activationRadioButtons.forEach { radioButton ->
+            panel.add(radioButton)
+        }
+
+        activationRadioButtons.first().isSelected = true
+
+        return panel
+    }
+
     fun updateMSE(epoch: Int, mse: Double) {
         mseSeries.add(epoch.toDouble(), mse)
     }
@@ -275,11 +307,12 @@ class NeuralNetworkUI(
         val hiddenLayerCount = hiddenLayersTextField.text.toIntOrNull() ?: 0
         val outputLayerCount = outputLayersTextField.text.toIntOrNull() ?: 0
         val k = kFoldsField.text.toIntOrNull() ?: 0
+        val testLinesCount = textLinesTextField.text.toIntOrNull() ?: 0
 
         config.saveConfigs(
             trainFile = trainingFile,
             targetFile = targetFile,
-            testFile = testFile,
+            testLinesCount = testLinesCount,
             epochs = epochs,
             learningRate = learningRate,
             k = k,
@@ -314,38 +347,11 @@ class NeuralNetworkUI(
         return true
     }
 
-    private fun chooseFile(fileLabel: JLabel): File? {
-        val returnValue = fileChooser.showOpenDialog(this)
-        return if (returnValue == JFileChooser.APPROVE_OPTION) {
-            fileLabel.text = fileChooser.selectedFile.path
-            fileChooser.selectedFile
-        } else null
+    fun getSelectedActivationFunction(): ActivationFunction {
+        return activationFunctions.first { (name, _) ->
+            activationRadioButtons.first { it.text == name }.isSelected
+        }.second
     }
 
-    private fun createRow() = JPanel().apply {
-        layout = BoxLayout(this, BoxLayout.X_AXIS)
-        alignmentX = LEFT_ALIGNMENT
-    }
 
-    private fun createInput(
-        label: String,
-        textField: JTextField,
-        initialText: String
-    ): JPanel {
-        return createRow().apply {
-            add(JLabel(label))
-            add(textField)
-            textField.text = initialText
-        }
-    }
-
-    private fun createColumn() = JPanel().apply {
-        layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        alignmentY = TOP_ALIGNMENT
-    }
-
-    private fun showError(message: String) {
-        JOptionPane.showMessageDialog(null, message, "Erro", JOptionPane.ERROR_MESSAGE)
-
-    }
 }
