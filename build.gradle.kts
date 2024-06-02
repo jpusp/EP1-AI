@@ -11,7 +11,7 @@ repositories {
 
 dependencies {
     implementation("org.jfree:jfreechart:1.5.3")
-    implementation("com.google.code.gson:gson:2.8.8")
+    implementation("com.google.code.gson:gson:2.8.9")
     testImplementation("org.jetbrains.kotlin:kotlin-test")
 }
 
