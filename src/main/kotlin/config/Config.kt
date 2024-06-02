@@ -6,7 +6,7 @@ import java.io.File
 
 private const val TrainFilePathKey = "trainFilePath"
 private const val TargetFilePathKey = "targetFilePath"
-private const val TestFilePathKey = "testFilePath"
+private const val TestLineCountKey = "testLineCountPath"
 private const val EpochsKey = "epochs"
 private const val LearningRateKey = "learningRate"
 private const val KFoldsKey = "kFolds"
@@ -25,7 +25,7 @@ class Config {
 
     fun targetFile() = loadFilePath(TargetFilePathKey)
 
-    fun testFile() = loadFilePath(TestFilePathKey)
+    fun testLinesCount(): Int = loadValue<Number>(TestLineCountKey)?.toInt() ?: 0
 
     fun epochs(): Int = loadValue<Number>(EpochsKey)?.toInt() ?: 0
 
@@ -40,7 +40,7 @@ class Config {
     fun saveConfigs(
         trainFile: File? = null,
         targetFile: File? = null,
-        testFile: File? = null,
+        testLinesCount: Int = 0,
         epochs: Int = 0,
         learningRate: Double = 0.0,
         k: Int = 0,
@@ -50,7 +50,7 @@ class Config {
         with(configMap) {
             putIfNotNull(TrainFilePathKey, trainFile?.path)
             putIfNotNull(TargetFilePathKey, targetFile?.path)
-            putIfNotNull(TestFilePathKey, testFile?.path)
+            put(TestLineCountKey, testLinesCount)
             put(EpochsKey, epochs)
             put(LearningRateKey, learningRate)
             put(KFoldsKey, k)
