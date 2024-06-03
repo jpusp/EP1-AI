@@ -1,3 +1,5 @@
+package functions
+
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -8,16 +10,15 @@ fun calculateConfusionMatrix(
 ): Array<IntArray> {
     val numClasses = alphabet.size
     val confusionMatrix = Array(numClasses) { IntArray(numClasses) }
-    val labelToIndex = alphabet.withIndex().associate { it.value to it.index }
+    val labelToIndexMap = alphabet.withIndex().associate { it.value to it.index }
 
     for ((trueLabel, predictedLabel) in trueLabels.zip(predictedLabels)) {
-        val trueIndex = labelToIndex[trueLabel] ?: continue
-        val predictedIndex = labelToIndex[predictedLabel] ?: continue
+        val trueIndex = labelToIndexMap[trueLabel] ?: continue
+        val predictedIndex = labelToIndexMap[predictedLabel] ?: continue
         confusionMatrix[trueIndex][predictedIndex]++
     }
     return confusionMatrix
 }
-
 
 fun calculateAccuracy(confusionMatrix: Array<IntArray>): Double {
     val correctPredictions = confusionMatrix.indices.sumOf { confusionMatrix[it][it] }
@@ -57,13 +58,6 @@ fun calculateRecall(confusionMatrix: Array<IntArray>): Double {
     }
 
     return if (count == 0) 0.0 else sumRecall / count
-}
-
-fun calculateF1Score(confusionMatrix: Array<IntArray>): Double {
-    val precision = calculatePrecision(confusionMatrix)
-    val recall = calculateRecall(confusionMatrix)
-
-    return if (precision + recall == 0.0) 0.0 else 2 * (precision * recall) / (precision + recall)
 }
 
 fun calculateStandardDeviation(data: List<Double>): Double {

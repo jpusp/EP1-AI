@@ -1,9 +1,8 @@
 package ui
 
-import calculateAccuracy
-import calculateF1Score
-import calculatePrecision
-import calculateRecall
+import functions.calculateAccuracy
+import functions.calculatePrecision
+import functions.calculateRecall
 import org.jfree.chart.ChartPanel
 import org.jfree.chart.JFreeChart
 import org.jfree.chart.axis.NumberAxis
@@ -24,6 +23,7 @@ import javax.swing.JFrame
 import javax.swing.JFrame.DISPOSE_ON_CLOSE
 import javax.swing.JLabel
 import javax.swing.SwingUtilities
+import javax.swing.border.EmptyBorder
 
 fun displayConfusionMatrixWithJFreeChart(confusionMatrix: Array<IntArray>, alphabet: List<Char>) {
     val dataset = DefaultXYZDataset()
@@ -65,6 +65,8 @@ fun displayConfusionMatrixWithJFreeChart(confusionMatrix: Array<IntArray>, alpha
         val frame = JFrame("Resultado do Treinamento")
         frame.layout = BorderLayout()
 
+        frame.rootPane.border = EmptyBorder(20, 20, 20, 20)
+
         val chartPanel = ChartPanel(chart)
         frame.add(chartPanel, BorderLayout.CENTER)
 
@@ -72,12 +74,10 @@ fun displayConfusionMatrixWithJFreeChart(confusionMatrix: Array<IntArray>, alpha
             val accuracy = calculateAccuracy(confusionMatrix)
             val precision = calculatePrecision(confusionMatrix)
             val recall = calculateRecall(confusionMatrix)
-            val f1Score = calculateF1Score(confusionMatrix)
 
             add(JLabel("Acurácia: $accuracy"))
             add(JLabel("Precisão: $precision"))
             add(JLabel("Sensibilidade: $recall"))
-            add(JLabel("F1 Score: $f1Score"))
         }
 
         frame.add(metricsPanel, BorderLayout.SOUTH)

@@ -10,13 +10,13 @@ import org.jfree.chart.labels.StandardXYToolTipGenerator
 import org.jfree.chart.plot.PlotOrientation
 import org.jfree.data.xy.XYSeries
 import org.jfree.data.xy.XYSeriesCollection
-import ui.components.chooseFile
-import ui.components.createColumn
-import ui.components.createInput
-import ui.components.showError
+import ui.components.*
+import java.awt.Dimension
 import java.awt.GridLayout
 import java.io.File
 import javax.swing.*
+import javax.swing.border.EmptyBorder
+import kotlin.concurrent.thread
 
 
 const val NoFileSelected = "Nenhum arquivo selecionado"
@@ -27,10 +27,9 @@ class NeuralNetworkUI(
 ) : JFrame("Neural Network Configuration") {
     private var trainingFile: File? = null
     private var targetFile: File? = null
-    private var testFile: File? = null
     private val trainingFileLabel = JLabel(NoFileSelected)
     private val targetFileLabel = JLabel(NoFileSelected)
-    private val mseSeries = XYSeries("MSE")
+    private val mseSeries = XYSeries("ErroQM")
     private val epochsTextField = JTextField("", 10)
     private val learningRateField = JTextField("0.2", 10)
     private val kFoldsField = JTextField("10", 10)
@@ -38,6 +37,7 @@ class NeuralNetworkUI(
     private val outputLayersTextField = JTextField("7", 10)
     private val textLinesTextField = JTextField("130", 10)
     private val activationButtonGroup = ButtonGroup()
+    private val logTextArea = JTextArea(10, 50)
 
     private val activationFunctions = listOf(
         "Sigmoid" to sigmoidActivation,
@@ -54,46 +54,72 @@ class NeuralNetworkUI(
     }
 
     init {
-        setSize(1000, 600)
+        setSize(1000, 700)
         defaultCloseOperation = EXIT_ON_CLOSE
         layout = BoxLayout(contentPane, BoxLayout.Y_AXIS)
         setLocationRelativeTo(null)
 
+        rootPane.border = EmptyBorder(20, 20, 20, 20)
+
+        add(createFileSection())
+        add(Box.createRigidArea(Dimension(0, 10)))
         add(createTrainingSection())
+        add(Box.createRigidArea(Dimension(0, 10)))
         add(createTrainingButtons())
         add(createTestingButtons())
         add(createGraph())
+        add(createLogArea())
 
         isVisible = true
     }
+
+    private fun createFileSection(): JPanel {
+        val row = JPanel(GridLayout(2, 1, 10, 0))
+        return row.apply {
+            add(
+                createRow().apply {
+                    add(
+                        JButton("Selecionar Training File").apply {
+                            config.trainFile()?.run {
+                                trainingFile = this
+                                trainingFileLabel.text = this.path
+                            }
+                            addActionListener {
+                                trainingFile = chooseFile(trainingFileLabel, this@NeuralNetworkUI)
+                            }
+                        }
+                    )
+
+                    add(trainingFileLabel)
+                }
+            )
+
+            add(
+                createRow().apply {
+                    add(
+                        JButton("Selecionar Target File").apply {
+                            config.targetFile()?.run {
+                                targetFile = this
+                                targetFileLabel.text = this.path
+                            }
+                            addActionListener {
+                                targetFile = chooseFile(targetFileLabel, this@NeuralNetworkUI)
+                            }
+                        }
+                    )
+
+                    add(targetFileLabel)
+                }
+            )
+        }
+    }
+
 
     private fun createTrainingSection(): JPanel {
         val row = JPanel(GridLayout(1, 2, 10, 10))
 
         row.add(
             createColumn().apply {
-                add(JButton("Selecionar Training File").apply {
-                    config.trainFile()?.run {
-                        trainingFile = this
-                        trainingFileLabel.text = this.path
-                    }
-                    addActionListener {
-                        trainingFile = chooseFile(trainingFileLabel, this@NeuralNetworkUI)
-                    }
-                })
-                add(trainingFileLabel)
-
-                add(JButton("Selecionar Target File").apply {
-                    config.targetFile()?.run {
-                        targetFile = this
-                        targetFileLabel.text = this.path
-                    }
-                    addActionListener {
-                        targetFile = chooseFile(targetFileLabel, this@NeuralNetworkUI)
-                    }
-                })
-                add(targetFileLabel)
-
                 add(
                     createInput(
                         label = "Épocas: ",
@@ -127,21 +153,13 @@ class NeuralNetworkUI(
                 )
 
                 add(
-                    createActivationFunctionSelection()
-                )
-
-                add(
                     createInput(
                         label = "k: ",
                         textField = kFoldsField,
                         initialText = config.k().toString()
                     )
                 )
-            }
-        )
 
-        row.add(
-            createColumn().apply {
                 add(JLabel("Quantas linhas do final do arquivo devem ser usadas para teste?"))
                 add(
                     createInput(
@@ -150,6 +168,13 @@ class NeuralNetworkUI(
                         initialText = config.testLinesCount().toString()
                     )
                 )
+            }
+        )
+
+        row.add(
+            createColumn().apply {
+                add(createActivationFunctionSelection())
+
             }
         )
 
@@ -216,7 +241,7 @@ class NeuralNetworkUI(
         val chart = ChartFactory.createXYLineChart(
             "Erro quadrático médio",
             "Época",
-            "MSE",
+            "ErroQM",
             dataset,
             PlotOrientation.VERTICAL,
             true,
@@ -228,7 +253,7 @@ class NeuralNetworkUI(
         val toolTipGenerator = StandardXYToolTipGenerator()
         plot.renderer.defaultToolTipGenerator = toolTipGenerator
 
-        val logAxis = LogarithmicAxis("MSE")
+        val logAxis = LogarithmicAxis("ErroQM")
         plot.rangeAxis = logAxis
 
         return ChartPanel(chart)
@@ -248,36 +273,60 @@ class NeuralNetworkUI(
         return panel
     }
 
-    fun updateMSE(epoch: Int, mse: Double) {
-        mseSeries.add(epoch.toDouble(), mse)
+    private fun createLogArea(): JScrollPane {
+        logTextArea.isEditable = false
+        return JScrollPane(logTextArea)
     }
 
-    fun clearGraph() {
-        mseSeries.clear()
+    fun updateMSE(epoch: Int, mse: Double) {
+        SwingUtilities.invokeLater {
+            mseSeries.add(epoch.toDouble(), mse)
+        }
+        appendLog("Época: $epoch, MSE: $mse")
+    }
+
+    fun clearExecutionLogs() {
+        SwingUtilities.invokeLater {
+            mseSeries.clear()
+            logTextArea.text = ""
+        }
+    }
+
+    fun appendLog(message: String) {
+        SwingUtilities.invokeLater {
+            logTextArea.append("$message\n")
+            logTextArea.caretPosition = logTextArea.document.length
+        }
     }
 
     private fun trainMLP() {
-        trainNetwork { config ->
-            uiListener.onTrainButtonClick(config)
+        runInBackground {
+            trainNetwork { config ->
+                uiListener.onTrainButtonClick(config)
+            }
         }
     }
 
     private fun trainCrossValidation() {
-        trainNetwork { config ->
-            uiListener.onCrossValidationButtonClick(config)
+        runInBackground {
+            trainNetwork { config ->
+                uiListener.onCrossValidationButtonClick(config)
+            }
         }
     }
 
     private fun trainEarlyStopping() {
-        trainNetwork { config ->
-            uiListener.onEarlyStopButtonClick(config)
+        runInBackground {
+            trainNetwork { config ->
+                uiListener.onEarlyStopButtonClick(config)
+            }
         }
     }
 
     private fun trainNetwork(
         action: (Config) -> Unit
     ) {
-        clearGraph()
+        clearExecutionLogs()
         val config = updateConfig()
         val isInputValid = validateInputs(config)
 
@@ -351,6 +400,16 @@ class NeuralNetworkUI(
         return activationFunctions.first { (name, _) ->
             activationRadioButtons.first { it.text == name }.isSelected
         }.second
+    }
+
+    private fun runInBackground(action: () -> Unit) {
+        thread {
+            try {
+                action()
+            } catch (e: Exception) {
+                appendLog("Erro: ${e.message}")
+            }
+        }
     }
 
 

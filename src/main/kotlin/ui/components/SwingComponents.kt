@@ -11,7 +11,7 @@ fun createColumn() = JPanel().apply {
     alignmentY = TOP_ALIGNMENT
 }
 
-private fun createRow() = JPanel().apply {
+fun createRow() = JPanel().apply {
     layout = BoxLayout(this, BoxLayout.X_AXIS)
     alignmentX = LEFT_ALIGNMENT
 }

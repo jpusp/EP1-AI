@@ -35,19 +35,6 @@ fun softplusDerivative(x: Double): Double {
     return 1 / (1 + exp(-clippedX))
 }
 
-fun softmax(inputs: List<Double>): List<Double> {
-    val maxInput = inputs.maxOrNull() ?: 0.0
-    val expInputs = inputs.map {
-        kotlin.math.exp(it - maxInput)
-    }
-
-    val sumOfExpInputs = expInputs.sum()
-
-    return expInputs.map {
-        it / sumOfExpInputs
-    }
-}
-
 val reluActivation = ActivationFunction(::relu, ::reluDerivative)
 val sigmoidActivation = ActivationFunction(::sigmoid, ::sigmoidDerivative)
 val tanhActivation = ActivationFunction(::tanh, ::tanhDerivative)

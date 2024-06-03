@@ -21,7 +21,8 @@ class MLP(
         targets: List<List<Double>>,
         epochs: Int,
         epochsOffset: Int = 0,
-        learningRate: Double
+        learningRate: Double,
+        shouldUpdateMse: Boolean = true
     ) {
         for (epoch in 1..epochs) {
             var sumSquaredErrors = 0.0
@@ -39,7 +40,9 @@ class MLP(
             }
 
             val mse = sumSquaredErrors / totalCount
-            onMSECalculated(epoch, epochsOffset, mse)
+            if (shouldUpdateMse) {
+                onMSECalculated(epoch, epochsOffset, mse)
+            }
         }
 
         saveWeights(
@@ -56,7 +59,7 @@ class MLP(
         epochs: Int,
         learningRate: Double,
         patience: Int,
-
+        onEarlyStop: (Int) -> Unit
     ) {
         val minDelta = 1e-4
         var bestMSE = Double.MAX_VALUE
@@ -65,14 +68,15 @@ class MLP(
         var bestWeightsOutputLayer: List<Pair<List<Double>, Double>>? = null
 
         for (epoch in 1..epochs) {
-            print("Época: $epoch - ")
             train(
                 inputs = inputs,
                 targets = targets,
                 epochs = 1,
-                learningRate = learningRate
+                learningRate = learningRate,
+                shouldUpdateMse = false
             )
             val mse = test(validationInputs, validationTargets)
+            onMSECalculated(epoch, 0, mse)
 
             if (bestMSE - mse > minDelta) {
                 bestMSE = mse
@@ -82,7 +86,7 @@ class MLP(
             } else {
                 epochsWithoutImprovement++
                 if (epochsWithoutImprovement >= patience) {
-                    println("Parada antecipada na epoca $epoch")
+                    onEarlyStop(epoch)
                     break
                 }
             }

@@ -10,12 +10,6 @@ fun splitData(
     val totalSize = inputs.size
     val validationSize = (totalSize * validationSplit).toInt()
 
-    val trainingInputs = inputs.dropLast(validationSize)
-    val trainingTargets = targets.dropLast(validationSize)
-
-    val validationInputs = inputs.takeLast(validationSize)
-    val validationTargets = targets.takeLast(validationSize)
-
     return TrainingSets(
         trainingInput = inputs.dropLast(validationSize),
         trainingTarget = targets.dropLast(validationSize),

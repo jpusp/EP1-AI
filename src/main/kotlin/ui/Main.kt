@@ -1,15 +1,11 @@
 package ui
 
-import calculateAccuracy
-import calculateConfusionMatrix
-import calculateStandardDeviation
 import config.Config
 import functions.*
 import mlp.Layer
 import mlp.MLP
 import mlp.Neuron
 import model.ActivationFunction
-import java.io.File
 import java.util.*
 import javax.swing.SwingUtilities
 import kotlin.math.sqrt
@@ -86,7 +82,10 @@ class Main : UIListener {
             validationTargets = trainingSets.validationTarget,
             epochs = config.epochs(),
             learningRate = config.learningRate(),
-            patience = 50
+            patience = 50,
+            onEarlyStop = { epoch ->
+                ui.appendLog("Parada antecipada na epoca $epoch")
+            }
         )
     }
 
@@ -116,17 +115,14 @@ class Main : UIListener {
         val predictedLabels = mlp.predict(inputs).map { oneHotToChar(it) }
 
         val confusionMatrix = calculateConfusionMatrix(trueLabels, predictedLabels, alphabet)
-        val accuracy = calculateAccuracy(confusionMatrix)
         val stdDeviation = calculateStandardDeviation(predictedLabels.map { it.toDouble() })
 
-        println("Matriz de Confusão: ${confusionMatrix.contentDeepToString()}")
-        println("Acurácia: $accuracy")
         println("Desvio Padrão: $stdDeviation")
 
         displayConfusionMatrixWithJFreeChart(confusionMatrix, alphabet)
     }
 
-    fun crossValidate(
+    private fun crossValidate(
         inputs: List<List<Double>>,
         targets: List<List<Double>>,
         k: Int,
@@ -179,7 +175,6 @@ class Main : UIListener {
         epochOffset: Int = 0,
         mse: Double
     ) {
-        println("${epoch + epochOffset}; $mse")
         ui.updateMSE(epoch + epochOffset, mse)
     }
 
@@ -240,10 +235,6 @@ class Main : UIListener {
         }
 
         return Layer(neurons, numInputs)
-    }
-
-    fun List<Double>.normalize(): List<Double> {
-        return map { if (it == -1.0) 0.0 else 1.0 }
     }
 
     private fun createRandomNumber(): Double = kotlin.random.Random.nextDouble() * 0.1 - 0.05
