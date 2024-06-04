@@ -244,6 +244,7 @@ class Main : UIListener {
         ui.updateMSE(epoch + epochOffset, mse)
     }
 
+    // Função para criar uma MLP com as camadas ocultas e de saída
     private fun createMLP(
         initialSize: Int,
         loadWeights: Boolean = false,
@@ -282,6 +283,7 @@ class Main : UIListener {
         return mlp
     }
 
+    // Função para criar uma camada com neurônios
     private fun createLayer(
         numInputs: Int,
         numNeurons: Int,
@@ -289,6 +291,7 @@ class Main : UIListener {
     ): Layer {
         val neurons = (1..numNeurons).map {
             val weights = if (activationFunction == reluActivation) {
+                // cria valores aleatorios diferentes quando a funcao de ativacao é ReLU
                 MutableList(numInputs) { createRandomNumberReLU(numInputs) }
             } else {
                 MutableList(numInputs) { createRandomNumber() }

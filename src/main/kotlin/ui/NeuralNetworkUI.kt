@@ -89,6 +89,7 @@ class NeuralNetworkUI(
         isVisible = true
     }
 
+    // Cria a seção de seleção de arquivos de treinamento e alvo
     private fun createFileSection(): JPanel {
         val row = JPanel(GridLayout(2, 1, 10, 0))
         return row.apply {
@@ -130,7 +131,7 @@ class NeuralNetworkUI(
         }
     }
 
-
+    // Cria a seção de treinamento com os campos de entrada necessários
     private fun createTrainingSection(): JPanel {
         val row = JPanel(GridLayout(1, 2, 10, 10))
 
@@ -197,6 +198,7 @@ class NeuralNetworkUI(
         return row
     }
 
+    // Cria os botões de treinamento
     private fun createTrainingButtons(): JPanel {
         return JPanel(GridLayout(1, 3, 10, 10)).also { panel ->
 
@@ -266,6 +268,7 @@ class NeuralNetworkUI(
         }
     }
 
+    // Cria o gráfico para exibir o Erro Quadrático Médio (EQM) ao longo das épocas
     private fun createGraph(): ChartPanel {
         val dataset = XYSeriesCollection(mseSeries)
         val chart = ChartFactory.createXYLineChart(
@@ -308,11 +311,13 @@ class NeuralNetworkUI(
         return panel
     }
 
+    // Cria a área de log para exibir as mensagens durante o treinamento e teste
     private fun createLogArea(): JScrollPane {
         logTextArea.isEditable = false
         return JScrollPane(logTextArea)
     }
 
+    // Atualiza o gráfico com o valor do EQM para a época fornecida
     fun updateMSE(epoch: Int, mse: Double) {
         SwingUtilities.invokeLater {
             mseSeries.add(epoch.toDouble(), mse)
@@ -335,11 +340,13 @@ class NeuralNetworkUI(
         }
     }
 
+    // Exibe os hiperparâmetros no log e na interface gráfica
     fun logHyperParams(params: HyperparameterCombination) {
         appendLog("Testando Hiperparâmetro: $params")
         hyperParametersLabel.text = params.toString()
     }
 
+    // Inicia o treinamento da rede neural MLP
     private fun trainMLP() {
         runInBackground {
             trainNetwork { config ->
@@ -348,6 +355,7 @@ class NeuralNetworkUI(
         }
     }
 
+    // Inicia o treinamento da rede neural MLP com validação cruzada
     private fun trainCrossValidation() {
         runInBackground {
             trainNetwork { config ->
@@ -356,6 +364,7 @@ class NeuralNetworkUI(
         }
     }
 
+    // Inicia o treinamento da rede neural MLP com parada antecipada
     private fun trainEarlyStopping() {
         runInBackground {
             trainNetwork { config ->
@@ -364,6 +373,7 @@ class NeuralNetworkUI(
         }
     }
 
+    // Função genérica para realizar o treinamento da rede neural
     private fun trainNetwork(
         action: (Config) -> Unit
     ) {
@@ -380,6 +390,7 @@ class NeuralNetworkUI(
         }
     }
 
+    // Testa a rede neural MLP com o conjunto de dados de teste
     private fun testNetwork(
         hiddenWeightsPath: String,
         outputWeightsPath: String
@@ -391,6 +402,7 @@ class NeuralNetworkUI(
         )
     }
 
+    // Atualiza a configuração com os valores inseridos pelo usuário
     private fun updateConfig(): Config {
         val epochs = epochsTextField.text.toIntOrNull() ?: 500
         val learningRate = learningRateField.text.toDoubleOrNull() ?: 0.0
@@ -445,6 +457,7 @@ class NeuralNetworkUI(
         }.second
     }
 
+    // Executa uma ação em background em uma nova thread
     private fun runInBackground(action: () -> Unit) {
         thread {
             try {
