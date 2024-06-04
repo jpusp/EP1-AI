@@ -12,6 +12,7 @@ private const val LearningRateKey = "learningRate"
 private const val KFoldsKey = "kFolds"
 private const val HiddenLayerCountKey = "hiddenLayer"
 private const val OutputLayerCountKey = "outputLayer"
+private const val PatienceKey = "patience"
 class Config {
     private val configMap = mutableMapOf<String, Any>()
     private val gson = Gson()
@@ -37,6 +38,8 @@ class Config {
 
     fun outputLayerCount() = loadValue<Number>(OutputLayerCountKey)?.toInt() ?: 0
 
+    fun patience() = loadValue<Number>(PatienceKey)?.toInt() ?: 0
+
     fun saveConfigs(
         trainFile: File? = null,
         targetFile: File? = null,
@@ -45,7 +48,8 @@ class Config {
         learningRate: Double = 0.0,
         k: Int = 0,
         hiddenLayerCount: Int = 0,
-        outputLayerCount: Int = 0
+        outputLayerCount: Int = 0,
+        patience: Int = 50
     ) {
         with(configMap) {
             putIfNotNull(TrainFilePathKey, trainFile?.path)
@@ -56,6 +60,7 @@ class Config {
             put(KFoldsKey, k)
             put(HiddenLayerCountKey, hiddenLayerCount)
             put(OutputLayerCountKey, outputLayerCount)
+            put(PatienceKey, patience)
         }
 
         storeConfigs()

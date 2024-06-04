@@ -1,5 +1,6 @@
 package ui
 
+import benchmark.HyperparameterCombination
 import config.Config
 import functions.*
 import mlp.Layer
@@ -41,7 +42,8 @@ class Main : UIListener {
             inputs = inputs,
             targets = targets,
             epochs = config.epochs(),
-            learningRate = config.learningRate()
+            learningRate = config.learningRate(),
+            onEarlyStop = {}
         )
     }
 
@@ -71,18 +73,16 @@ class Main : UIListener {
         val inputs = trainingPair.first
         val targets = trainingPair.second
 
-        val trainingSets = splitData(inputs, targets)
-
         val mlp = createMLP(inputs.first().size)
 
-        mlp.trainWithEarlyStopping(
-            inputs = trainingSets.trainingInput,
-            targets = trainingSets.trainingTarget,
-            validationInputs = trainingSets.validationInput,
-            validationTargets = trainingSets.validationTarget,
+        mlp.train(
+            inputs = inputs,
+            targets = targets,
             epochs = config.epochs(),
+            epochsOffset = 0,
             learningRate = config.learningRate(),
-            patience = 50,
+            patience = config.patience(),
+            isEarlyStop = true,
             onEarlyStop = { epoch ->
                 ui.appendLog("Parada antecipada na epoca $epoch")
             }
@@ -100,19 +100,19 @@ class Main : UIListener {
             action = { it.takeLast(config.testLinesCount()) }
         )
 
-        val inputs = testPair.first
+        val testInputs = testPair.first
         val trueLabels = testPair.second
             .takeLast(config.testLinesCount())
             .map { oneHotToChar(it) }
 
         val mlp = createMLP(
-            initialSize = inputs.firstOrNull()?.size ?: 0,
+            initialSize = testInputs.firstOrNull()?.size ?: 0,
             loadWeights = true,
             hiddenWeightsPath = hiddenWeightsPath,
             outputWeightsPath = outputWeightsPath,
         )
 
-        val predictedLabels = mlp.predict(inputs).map { oneHotToChar(it) }
+        val predictedLabels = mlp.predict(testInputs).map { oneHotToChar(it) }
 
         val confusionMatrix = calculateConfusionMatrix(trueLabels, predictedLabels, alphabet)
         val stdDeviation = calculateStandardDeviation(predictedLabels.map { it.toDouble() })
@@ -147,11 +147,12 @@ class Main : UIListener {
 
             val mlp = createMLP(inputs.first().size)
             mlp.train(
-                trainingInputs,
-                trainingTargets,
-                epochs,
+                inputs = trainingInputs,
+                targets = trainingTargets,
+                epochs = epochs,
                 epochsOffset = epochs * i,
-                learningRate
+                learningRate = learningRate,
+                onEarlyStop = {}
             )
 
             val mse = mlp.test(validationInputs, validationTargets)
@@ -170,6 +171,71 @@ class Main : UIListener {
         return totalMSE / k
     }
 
+    override fun onHyperParamsButtonClick() {
+        val hyperparameters = listOf(
+            HyperparameterCombination(0.1, 60, sigmoidActivation, 100),
+            HyperparameterCombination(0.2, 60, sigmoidActivation, 100),
+            HyperparameterCombination(0.5, 60, sigmoidActivation, 100),
+            HyperparameterCombination(0.6, 60, sigmoidActivation, 100),
+            HyperparameterCombination(0.2, 30, sigmoidActivation, 100),
+            HyperparameterCombination(0.5, 70, sigmoidActivation, 120),
+            HyperparameterCombination(0.4, 100, sigmoidActivation, 150),
+            HyperparameterCombination(0.4, 70, sigmoidActivation, 300)
+        )
+
+        val results = hyperparameters.map {
+            ui.logHyperParams(it)
+            trainAndEvaluate(it)
+        }
+
+        displayAccuracyGraph(results)
+    }
+
+    fun trainAndEvaluate(params: HyperparameterCombination): HyperparameterCombination {
+        val trainingPair = readFiles(
+            trainingFile = config.trainFile(),
+            targetFile = config.targetFile(),
+            action = { it.dropLast(config.testLinesCount()) }
+        )
+
+        val testPair = readFiles(
+            trainingFile = config.trainFile(),
+            targetFile = config.targetFile(),
+            action = { it.takeLast(config.testLinesCount()) }
+        )
+
+        val inputs = trainingPair.first
+        val targets = trainingPair.second
+        val testInputs = testPair.first
+        val testTargets = testPair.second
+
+        val mlp = createMLP(
+            initialSize = inputs.firstOrNull()?.size ?: 0,
+            activationFunction = params.activationFunction,
+            hiddenLayerCount = params.hiddenNeurons
+        )
+
+        mlp.train(
+            inputs = inputs,
+            targets =targets,
+            epochs = params.epochs,
+            learningRate = params.learningRate,
+            onEarlyStop = {}
+        )
+
+        val trueLabels = testTargets
+            .takeLast(config.testLinesCount())
+            .map { oneHotToChar(it) }
+
+        val predictedLabels = mlp.predict(testInputs).map { oneHotToChar(it) }
+
+        val confusionMatrix = calculateConfusionMatrix(trueLabels, predictedLabels, alphabet)
+        val accuracy = calculateAccuracy(confusionMatrix)
+        params.accuracy = accuracy
+        return params
+    }
+
+
     private fun updateMSE(
         epoch: Int,
         epochOffset: Int = 0,
@@ -181,20 +247,21 @@ class Main : UIListener {
     private fun createMLP(
         initialSize: Int,
         loadWeights: Boolean = false,
+        activationFunction: ActivationFunction = ui.getSelectedActivationFunction(),
+        hiddenLayerCount: Int = config.hiddenLayerCount(),
+        outputLayerCount: Int = config.outputLayerCount(),
         hiddenWeightsPath: String = "hidden_weights.txt",
         outputWeightsPath: String = "output_weights.txt"
     ): MLP {
-        val activationFunction = ui.getSelectedActivationFunction()
-
         val hiddenLayer = createLayer(
             numInputs = initialSize,
-            numNeurons = config.hiddenLayerCount(),
+            numNeurons = hiddenLayerCount,
             activationFunction = activationFunction
         )
 
         val outputLayer = createLayer(
-            numInputs = config.hiddenLayerCount(),
-            numNeurons = config.outputLayerCount(),
+            numInputs = hiddenLayerCount,
+            numNeurons = outputLayerCount,
             activationFunction = activationFunction
         )
 

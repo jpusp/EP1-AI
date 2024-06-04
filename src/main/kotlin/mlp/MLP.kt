@@ -22,8 +22,16 @@ class MLP(
         epochs: Int,
         epochsOffset: Int = 0,
         learningRate: Double,
-        shouldUpdateMse: Boolean = true
+        isEarlyStop: Boolean = false,
+        patience: Int = 50,
+        onEarlyStop: (Int) -> Unit
     ) {
+        val minDelta = 0.5e-4
+        var bestMSE = Double.MAX_VALUE
+        var epochsWithoutImprovement = 0
+        var bestWeightsHiddenLayer: List<Pair<List<Double>, Double>>? = null
+        var bestWeightsOutputLayer: List<Pair<List<Double>, Double>>? = null
+
         for (epoch in 1..epochs) {
             var sumSquaredErrors = 0.0
             var totalCount = 0
@@ -40,61 +48,79 @@ class MLP(
             }
 
             val mse = sumSquaredErrors / totalCount
-            if (shouldUpdateMse) {
-                onMSECalculated(epoch, epochsOffset, mse)
-            }
-        }
-
-        saveWeights(
-            hiddenLayerPath = "normal_hidden_weights.txt",
-            outputLayerPath = "normal_output_weights.txt"
-        )
-    }
-
-    fun trainWithEarlyStopping(
-        inputs: List<List<Double>>,
-        targets: List<List<Double>>,
-        validationInputs: List<List<Double>>,
-        validationTargets: List<List<Double>>,
-        epochs: Int,
-        learningRate: Double,
-        patience: Int,
-        onEarlyStop: (Int) -> Unit
-    ) {
-        val minDelta = 1e-4
-        var bestMSE = Double.MAX_VALUE
-        var epochsWithoutImprovement = 0
-        var bestWeightsHiddenLayer: List<Pair<List<Double>, Double>>? = null
-        var bestWeightsOutputLayer: List<Pair<List<Double>, Double>>? = null
-
-        for (epoch in 1..epochs) {
-            train(
-                inputs = inputs,
-                targets = targets,
-                epochs = 1,
-                learningRate = learningRate,
-                shouldUpdateMse = false
-            )
-            val mse = test(validationInputs, validationTargets)
-            onMSECalculated(epoch, 0, mse)
-
-            if (bestMSE - mse > minDelta) {
-                bestMSE = mse
-                epochsWithoutImprovement = 0
-                bestWeightsHiddenLayer = getLayerWeights(0)
-                bestWeightsOutputLayer = getLayerWeights(1)
-            } else {
-                epochsWithoutImprovement++
-                if (epochsWithoutImprovement >= patience) {
-                    onEarlyStop(epoch)
-                    break
+            onMSECalculated(epoch, epochsOffset, mse)
+            if (isEarlyStop) {
+                if (bestMSE - mse > minDelta) {
+                    bestMSE = mse
+                    epochsWithoutImprovement = 0
+                    bestWeightsHiddenLayer = getLayerWeights(0)
+                    bestWeightsOutputLayer = getLayerWeights(1)
+                } else {
+                    epochsWithoutImprovement++
+                    if (epochsWithoutImprovement >= patience) {
+                        onEarlyStop(epoch)
+                        break
+                    }
                 }
             }
         }
 
-        bestWeightsHiddenLayer?.let { saveWeightsToFile(it, "early_stopping_hidden_weights.txt") }
-        bestWeightsOutputLayer?.let { saveWeightsToFile(it, "early_stopping_output_weights.txt") }
+        if (isEarlyStop) {
+            bestWeightsHiddenLayer?.let { saveWeightsToFile(it, "early_stopping_hidden_weights.txt") }
+            bestWeightsOutputLayer?.let { saveWeightsToFile(it, "early_stopping_output_weights.txt") }
+        } else {
+            saveWeights(
+                hiddenLayerPath = "normal_hidden_weights.txt",
+                outputLayerPath = "normal_output_weights.txt"
+            )
+        }
     }
+
+//    fun trainWithEarlyStopping(
+//        inputs: List<List<Double>>,
+//        targets: List<List<Double>>,
+//        validationInputs: List<List<Double>>,
+//        validationTargets: List<List<Double>>,
+//        epochs: Int,
+//        learningRate: Double,
+//        patience: Int,
+//        onEarlyStop: (Int) -> Unit
+//    ) {
+//        val minDelta = 0.5e-4
+//        var bestMSE = Double.MAX_VALUE
+//        var epochsWithoutImprovement = 0
+//        var bestWeightsHiddenLayer: List<Pair<List<Double>, Double>>? = null
+//        var bestWeightsOutputLayer: List<Pair<List<Double>, Double>>? = null
+//
+//        for (epoch in 1..epochs) {
+//            train(
+//                inputs = inputs,
+//                targets = targets,
+//                epochs = 1,
+//                learningRate = learningRate,
+//                shouldUpdateMse = false,
+//                shouldSaveWeights = false
+//            )
+//            val mse = test(validationInputs, validationTargets)
+//            onMSECalculated(epoch, 0, mse)
+//
+//            if (bestMSE - mse > minDelta) {
+//                bestMSE = mse
+//                epochsWithoutImprovement = 0
+//                bestWeightsHiddenLayer = getLayerWeights(0)
+//                bestWeightsOutputLayer = getLayerWeights(1)
+//            } else {
+//                epochsWithoutImprovement++
+//                if (epochsWithoutImprovement >= patience) {
+//                    onEarlyStop(epoch)
+//                    break
+//                }
+//            }
+//        }
+//
+//        bestWeightsHiddenLayer?.let { saveWeightsToFile(it, "early_stopping_hidden_weights.txt") }
+//        bestWeightsOutputLayer?.let { saveWeightsToFile(it, "early_stopping_output_weights.txt") }
+//    }
 
     private fun backpropagate(error: List<Double>, learningRate: Double) {
         var currentError = error

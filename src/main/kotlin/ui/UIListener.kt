@@ -11,4 +11,6 @@ interface UIListener {
     fun onEarlyStopButtonClick(config: Config)
 
     fun onTestButtonClicked(hiddenWeightsPath: String, outputWeightsPath: String)
+
+    fun onHyperParamsButtonClick()
 }

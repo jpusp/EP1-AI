@@ -1,5 +1,6 @@
 package ui
 
+import benchmark.HyperparameterCombination
 import config.Config
 import functions.*
 import model.ActivationFunction
@@ -11,6 +12,7 @@ import org.jfree.chart.plot.PlotOrientation
 import org.jfree.data.xy.XYSeries
 import org.jfree.data.xy.XYSeriesCollection
 import ui.components.*
+import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.GridLayout
 import java.io.File
@@ -37,6 +39,11 @@ class NeuralNetworkUI(
     private val outputLayersTextField = JTextField("7", 10)
     private val textLinesTextField = JTextField("130", 10)
     private val activationButtonGroup = ButtonGroup()
+    private val patienceTextField = JTextField("7", 10)
+    private val hyperParametersLabel = JLabel().apply {
+        alignmentX = LEFT_ALIGNMENT
+    }
+
     private val logTextArea = JTextArea(10, 50)
 
     private val activationFunctions = listOf(
@@ -57,6 +64,7 @@ class NeuralNetworkUI(
         setSize(1000, 700)
         defaultCloseOperation = EXIT_ON_CLOSE
         layout = BoxLayout(contentPane, BoxLayout.Y_AXIS)
+
         setLocationRelativeTo(null)
 
         rootPane.border = EmptyBorder(20, 20, 20, 20)
@@ -67,7 +75,15 @@ class NeuralNetworkUI(
         add(Box.createRigidArea(Dimension(0, 10)))
         add(createTrainingButtons())
         add(createTestingButtons())
+        add(createHyperParamsButton())
         add(createGraph())
+        add(Box.createRigidArea(Dimension(0, 10)))
+
+        val hyperParamsPanel = JPanel()
+        hyperParamsPanel.layout = BorderLayout()
+        hyperParamsPanel.add(hyperParametersLabel, BorderLayout.WEST)
+        add(hyperParamsPanel)
+        add(Box.createRigidArea(Dimension(0, 10)))
         add(createLogArea())
 
         isVisible = true
@@ -236,6 +252,20 @@ class NeuralNetworkUI(
         }
     }
 
+    private fun createHyperParamsButton(): JPanel {
+        return JPanel(GridLayout(1, 1, 10, 10)).also { panel ->
+            panel.add(
+                JButton("Testar múltiplos hiperparâmetros").apply {
+                    addActionListener {
+                        runInBackground {
+                            uiListener.onHyperParamsButtonClick()
+                        }
+                    }
+                }
+            )
+        }
+    }
+
     private fun createGraph(): ChartPanel {
         val dataset = XYSeriesCollection(mseSeries)
         val chart = ChartFactory.createXYLineChart(
@@ -262,6 +292,11 @@ class NeuralNetworkUI(
     private fun createActivationFunctionSelection(): JPanel {
         val panel = JPanel()
         panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+
+        panel.add(
+            createInput("Paciência:", patienceTextField, "50")
+        )
+
         panel.add(JLabel("Função de Ativação: "))
 
         activationRadioButtons.forEach { radioButton ->
@@ -282,11 +317,12 @@ class NeuralNetworkUI(
         SwingUtilities.invokeLater {
             mseSeries.add(epoch.toDouble(), mse)
         }
-        appendLog("Época: $epoch, MSE: $mse")
+        appendLog("Época: $epoch, EQM: $mse")
     }
 
     fun clearExecutionLogs() {
         SwingUtilities.invokeLater {
+            hyperParametersLabel.text = ""
             mseSeries.clear()
             logTextArea.text = ""
         }
@@ -297,6 +333,11 @@ class NeuralNetworkUI(
             logTextArea.append("$message\n")
             logTextArea.caretPosition = logTextArea.document.length
         }
+    }
+
+    fun logHyperParams(params: HyperparameterCombination) {
+        appendLog("Testando Hiperparâmetro: $params")
+        hyperParametersLabel.text = params.toString()
     }
 
     private fun trainMLP() {
@@ -357,6 +398,7 @@ class NeuralNetworkUI(
         val outputLayerCount = outputLayersTextField.text.toIntOrNull() ?: 0
         val k = kFoldsField.text.toIntOrNull() ?: 0
         val testLinesCount = textLinesTextField.text.toIntOrNull() ?: 0
+        val patience = patienceTextField.text.toIntOrNull() ?: 0
 
         config.saveConfigs(
             trainFile = trainingFile,
@@ -366,7 +408,8 @@ class NeuralNetworkUI(
             learningRate = learningRate,
             k = k,
             hiddenLayerCount = hiddenLayerCount,
-            outputLayerCount = outputLayerCount
+            outputLayerCount = outputLayerCount,
+            patience = patience
         )
 
         return config

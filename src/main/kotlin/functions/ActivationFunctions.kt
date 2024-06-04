@@ -35,8 +35,8 @@ fun softplusDerivative(x: Double): Double {
     return 1 / (1 + exp(-clippedX))
 }
 
-val reluActivation = ActivationFunction(::relu, ::reluDerivative)
-val sigmoidActivation = ActivationFunction(::sigmoid, ::sigmoidDerivative)
-val tanhActivation = ActivationFunction(::tanh, ::tanhDerivative)
-val swishActivation = ActivationFunction(::swish, ::swishDerivative)
-val softplusActivation = ActivationFunction(::softplus, ::softplusDerivative)
+val reluActivation = ActivationFunction("ReLU", ::relu, ::reluDerivative)
+val sigmoidActivation = ActivationFunction("Sigmoid", ::sigmoid, ::sigmoidDerivative)
+val tanhActivation = ActivationFunction("TanH", ::tanh, ::tanhDerivative)
+val swishActivation = ActivationFunction("Swish",::swish, ::swishDerivative)
+val softplusActivation = ActivationFunction("SoftPlus", ::softplus, ::softplusDerivative)
